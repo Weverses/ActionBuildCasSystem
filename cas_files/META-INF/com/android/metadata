@@ -1,0 +1,9 @@
+ota-property-files=metadata:69:306,metadata.pb:443:184                 
+ota-required-cache=0
+ota-type=BLOCK
+post-build=Xiaomi/cas/cas:12/RKQ1.211001.001/22.8.15:user/release-keys
+post-build-incremental=22.8.15
+post-sdk-level=31
+post-security-patch-level=2022-08-01
+post-timestamp=1660494619
+pre-device=cas

@@ -1,0 +1,24 @@
+# Remove all existing dynamic partitions and groups before applying full OTA
+remove_all_groups
+# Add group qti_dynamic_partitions with maximum size 9126805504
+add_group qti_dynamic_partitions 9126805504
+# Add partition system to group qti_dynamic_partitions
+add system qti_dynamic_partitions
+# Add partition vendor to group qti_dynamic_partitions
+add vendor qti_dynamic_partitions
+# Add partition product to group qti_dynamic_partitions
+add product qti_dynamic_partitions
+# Add partition odm to group qti_dynamic_partitions
+add odm qti_dynamic_partitions
+# Add partition system_ext to group qti_dynamic_partitions
+add system_ext qti_dynamic_partitions
+# Grow partition system
+resize system system_size
+# Grow partition vendor
+resize vendor vendor_size
+# Grow partition product
+resize product product_size
+# Grow partition odm
+resize odm 134217728
+# Grow partition system_ext
+resize system_ext system_ext_size
