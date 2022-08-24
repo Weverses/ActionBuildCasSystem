@@ -19,19 +19,23 @@ jobs:
         run: |
           getCasLatestUrl(){
             cas_url=$(curl https://miui.511i.cn/1987836456/get_miui_test.php?codename=cas)
-            echo "cas_url=$cas_url" >> $GITHUB_ENV
+            echo "cas_url=$(curl https://miui.511i.cn/1987836456/get_miui_test.php?codename=cas)" >> $GITHUB_ENV
           }
           getPsycheLatestUrl(){
             psyche_url=$(curl https://miui.511i.cn/1987836456/get_miui_test.php?codename=psyche)
-            echo "psycheVer=$psyche_url" >> $GITHUB_ENV
+            echo "psycheVer=$(curl https://miui.511i.cn/1987836456/get_miui_test.php?codename=psyche)" >> $GITHUB_ENV
           }
           getCurrentVersion(){
             currentVer=$(cat "$GITHUB_WORKSPACE"/cas_current_version)
-            echo "currentVer=$currentVer" >> $GITHUB_ENV
+            echo "currentVer=$(cat "$GITHUB_WORKSPACE"/cas_current_version)" >> $GITHUB_ENV
           }
           getPsycheVersion(){
-            psycheVer=$(echo $latest_url | cut -d"/" -f4)
-            echo "psycheVer=$psycheVer" >> $GITHUB_ENV
+            psycheVer=$(echo $psyche_url | cut -d"/" -f4)
+            echo "psycheVer=$(echo $psyche_url | cut -d"/" -f4)" >> $GITHUB_ENV
+          }
+          getDate(){
+            date=$(echo $psyche_url | cut -d"/" -f4)
+            echo "date=$(echo $psyche_url | cut -d"/" -f4)" >> $GITHUB_ENV
           }
           checkVersion(){
             echo "device=cas" >> $GITHUB_ENV
@@ -40,6 +44,7 @@ jobs:
             getPsycheLatestUrl
             getCurrentVersion
             getPsycheVersion
+            getDate
             # 对比
             if [[ $currentVer != $psycheVer ]]; then
                 # 检测到更新,编译启动
@@ -51,7 +56,6 @@ jobs:
                 touch "$GITHUB_WORKSPACE"/cas_current_version
                 echo $latest_version > "$GITHUB_WORKSPACE"/cas_current_version
                 # 获取日期及commit描述
-                echo "date=$psycheVer" >> $GITHUB_ENV
                 echo "summary=更新至$date" >> $GITHUB_ENV
             fi
           }
@@ -85,7 +89,7 @@ jobs:
           if [[ ${{ env.shouldBuild }} == "true" ]]; then
               sudo apt install python3 python3-pip aria2 zip p7zip-full tar zipalign
               sudo apt --fix-broken install
-               sudo apt update --fix-missing
+              sudo apt update --fix-missing
               pip3 install --upgrade pip
               pip3 install pycryptodome
               pip3 install setuptools
@@ -182,8 +186,7 @@ jobs:
               sudo cp -f "$GITHUB_WORKSPACE"/${{ env.device }}/product/overlay/AospFrameworkResOverlay.apk "$GITHUB_WORKSPACE"/images/product/overlay
               sudo cp -f "$GITHUB_WORKSPACE"/${{ env.device }}/product/overlay/DevicesAndroidOverlay.apk "$GITHUB_WORKSPACE"/images/product/overlay
               sudo cp -f "$GITHUB_WORKSPACE"/${{ env.device }}/product/overlay/DevicesOverlay.apk "$GITHUB_WORKSPACE"/images/product/overlay
-              sudo cp -f "$GITHUB_WORKSPACE"/${{ env.device }}/product/etc/device_features/cas.xml "$GITHUB_WORKSPACE"/images/product/etc/device_features
-              done
+              sudo cp -f "$GITHUB_WORKSPACE"/${{ env.device }}/product/etc/device_features/cas.xml "$GITHUB_WORKSPACE"/images/product/etc/device_feature
               # NFC Fix
               for i in lib lib64; do
                 sudo cp -f "$GITHUB_WORKSPACE"/CAS/system/lib/libsn100nfc-nci.so "$GITHUB_WORKSPACE"/images/system_ext/lib/
@@ -302,7 +305,7 @@ jobs:
               system_size=$(sudo du -sb "$GITHUB_WORKSPACE"/images/system | awk {'print $1'})
               system_size=$(echo "$system_size + 104857600" | bc)
               system_size=$(echo "$system_size / 4096" | bc)
-              for i in product vendor system_ext system
+              for i in product vendor system_ext system;
               do
                   sudo python3 "$GITHUB_WORKSPACE"/tools/fspatch.py "$GITHUB_WORKSPACE"/images/$i "$GITHUB_WORKSPACE"/images/TI_config/"$i"_fs_config
                   "$GITHUB_WORKSPACE"/tools/mke2fs -O ^has_journal -L $i -I 256 -M /$i -m 0 -t ext4 -b 4096 "$GITHUB_WORKSPACE"/images/$i.img $(eval echo "$"$i"_size")
@@ -312,7 +315,7 @@ jobs:
                   sudo rm -rf "$GITHUB_WORKSPACE"/images/$i
               done
               sudo rm -rf "$GITHUB_WORKSPACE"/images/TI_config
-              for i in product system system_ext vendor
+              for i in product system system_ext vendor;
               do
                   "$GITHUB_WORKSPACE"/tools/img2simg "$GITHUB_WORKSPACE"/images/$i.img "$GITHUB_WORKSPACE"/simages/$i.img
                   rm -rf "$GITHUB_WORKSPACE"/images/$i.img
