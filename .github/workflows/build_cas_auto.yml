@@ -19,41 +19,27 @@ jobs:
         run: |
           getCasLatestUrl(){
             cas_url=$(curl https://miui.511i.cn/1987836456/get_miui_test.php?codename=cas)
-            echo 'cas_url<<EOF' >> $GITHUB_ENV
-            curl https://miui.511i.cn/1987836456/get_miui_test.php?codename=cas >> $GITHUB_ENV
-            echo 'EOF' >> $GITHUB_ENV
+            echo "cas_url=$cas_url" >> $GITHUB_ENV
           }
           getPsycheLatestUrl(){
             psyche_url=$(curl https://miui.511i.cn/1987836456/get_miui_test.php?codename=psyche)
-            echo 'psyche_url<<EOF' >> $GITHUB_ENV
-            curl https://miui.511i.cn/1987836456/get_miui_test.php?codename=psyche >> $GITHUB_ENV
-            echo 'EOF' >> $GITHUB_ENV
+            echo "psycheVer=$psyche_url" >> $GITHUB_ENV
           }
           getCurrentVersion(){
             currentVer=$(cat "$GITHUB_WORKSPACE"/cas_current_version)
-            echo 'currentVer<<EOF' >> $GITHUB_ENV
-            cat "$GITHUB_WORKSPACE"/cas_current_version >> $GITHUB_ENV
-            echo 'EOF' >> $GITHUB_ENV
+            echo "currentVer=$currentVer" >> $GITHUB_ENV
           }
           getPsycheVersion(){
             psycheVer=$(echo $latest_url | cut -d"/" -f4)
-            echo 'psycheVer<<EOF' >> $GITHUB_ENV
-            echo $latest_url | cut -d"/" -f4 >> $GITHUB_ENV
-            echo 'EOF' >> $GITHUB_ENV
-          }
-          getDevice(){
-            devcie=$(cat "$GITHUB_WORKSPACE"/device)
-            echo 'devicce<<EOF' >> $GITHUB_ENV
-            cat "$GITHUB_WORKSPACE"/device >> $GITHUB_ENV
-            echo 'EOF' >> $GITHUB_ENV
+            echo "psycheVer=$psycheVer" >> $GITHUB_ENV
           }
           checkVersion(){
+            echo "device=cas" >> $GITHUB_ENV
             # 调用函数获取信息（虽然可以直接获取信息，但这样看起来简洁好看
             getCasLatestUrl
             getPsycheLatestUrl
             getCurrentVersion
             getPsycheVersion
-            getDevice
             # 对比
             if [[ $currentVer != $psycheVer ]]; then
                 # 检测到更新,编译启动
@@ -99,7 +85,7 @@ jobs:
           if [[ ${{ env.shouldBuild }} == "true" ]]; then
               sudo apt install python3 python3-pip aria2 zip p7zip-full tar zipalign
               sudo apt --fix-broken install
-              sudo apt update --fix-missing
+               sudo apt update --fix-missing
               pip3 install --upgrade pip
               pip3 install pycryptodome
               pip3 install setuptools
@@ -297,7 +283,6 @@ jobs:
               # 声音动效动画 By PedroZ
               sudo unzip -o -q "$GITHUB_WORKSPACE"/${{ env.device }}_files/etc.zip -d "$GITHUB_WORKSPACE"/images/system/system/etc/audio/
           fi
-
       - name: 8.打包
         run: |
           if [[ ${{ env.shouldBuild }} == "true" ]]; then
@@ -351,7 +336,6 @@ jobs:
               mv "$GITHUB_WORKSPACE"/zip/miui_${{ env.codename }}_${{ env.date }}.zip "$GITHUB_WORKSPACE"/zip/miui_${{ env.codename }}_"${{ env.date }}"_"$zipmd5"_12.0.zip
               echo "NEW_PACKAGE_NAME=miui_${{ env.codename }}_"${{ env.date }}"_"$zipmd5"_12.0.zip" >> $GITHUB_ENV
           fi
-
       - name: 9.上传到123盘/阿里云盘
         run: |
           if [[ ${{ env.shouldBuild }} == "true" ]]; then
@@ -382,7 +366,6 @@ jobs:
                   upload
               fi
           fi
-
       - name: 10.发送打包成功通知
         run: |
           if [[ ${{ env.shouldBuild }} == "true" ]] && [[ ${{ github.event.inputs.needWechatPush }} == "true" ]]; then
@@ -401,7 +384,6 @@ jobs:
               echo ${{ env.device }}MD5=${{ env.MD5 }} >> "$GITHUB_WORKSPACE"/romdata/${{ env.device }}.ini
               echo ${{ env.device }}TIME=\"$(TZ=':Asia/Shanghai' date '+%Y.%m.%d %H:%M')\" >> "$GITHUB_WORKSPACE"/romdata/${{ env.device }}.ini
           fi
-
       - name: 11.导出信息
         uses: dmnemec/copy_file_to_another_repo_action@main
         env:
@@ -413,7 +395,6 @@ jobs:
           user_email: 'example@email.com'
           user_name: 'zjw2017'
           commit_message: 'Update from $GITHUB_REF'
-
       - name: 12.删除工作流运行
         uses: Mattraks/delete-workflow-runs@v2
         with:
