@@ -1,0 +1,301 @@
+name: build_cas_auto_zstd
+on:
+  workflow_dispatch:
+    inputs:
+      psyche_URL:
+        description: "psyche包下载地址"
+        required: true
+      cas_URL:
+        description: "cas包下载地址"
+        required: true
+      needWechatPush:
+        description: "是否需要使用WxPush推送编译信息(true/false)"
+        required: true
+        default: 'false'
+      upload:
+        description: "请输入上传网盘(ali/123pan/all)"
+        required: true
+        default: 'ali'
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@master
+      - name: 1.准备环境
+        run: |
+          echo "date=$(echo ${{ github.event.inputs.psyche_URL }} | cut -d"/" -f4)" >> $GITHUB_ENV
+          echo "ORIGN_ZIP_NAME=$(echo ${{ github.event.inputs.cas_URL }} | cut -d"/" -f5)" >> $GITHUB_ENV
+          sudo apt install python3 python3-pip aria2 zip p7zip-full tar zipalign zstd
+          sudo apt --fix-broken install
+          sudo apt update --fix-missing
+          pip3 install --upgrade pip
+          pip3 install pycryptodome
+          pip3 install setuptools
+          pip3 install docopt
+          pip3 install requests
+          pip3 install beautifulsoup4
+          pip3 install --ignore-installed pyyaml
+          curl https://rclone.org/install.sh | sudo bash
+          mkdir -p ~/.config/rclone/
+          unzip -P ${{ secrets.PASSWORD }} "$GITHUB_WORKSPACE"/tools/rclone.zip -d ~/.config/rclone/
+          curl -fsSL "https://nn.ci/alist.sh" | sudo bash -s install
+          sudo systemctl stop alist
+          sudo mv -f /home/runner/.config/rclone/data.db /opt/alist/data
+          sudo systemctl start alist
+      - name: 2.发送开始构建通知
+        run: |
+          if [[ ${{ github.event.inputs.needWechatPush }} == "true" ]]; then
+              curl -i -X POST -H 'Content-type':'application/json' -d '{"appToken":"${{secrets.appToken}}","summary":"小米10Ultra ${{env.date}}开始构建","content":" **小米10Ultra ${{env.date}}开始构建** ","topicIds":[7123],"contentType":3}' http://wxpusher.zjiecode.com/api/send/message || true
+              curl -i -X POST -H 'Content-type':'application/json' -d '{"token":"${{secrets.appToken2}}","title":"小米10Ultra ${{env.date}}开始构建","content":" **小米10Ultra ${{env.date}}开始构建** ","topic":"cas","template":"markdown"}' http://www.pushplus.plus/send || true
+          fi
+      - name: 3.下载系统包
+        run: |
+          # 下载psyche的最新系统包
+          mkdir -p "$GITHUB_WORKSPACE"/psyche_rom
+          cd "$GITHUB_WORKSPACE"/psyche_rom
+          aria2c -x16 -j$(nproc) -U "Mozilla/5.0" -d "$GITHUB_WORKSPACE" ${{ github.event.inputs.psyche_URL }}
+          # 下载cas的最新系统包
+          mkdir -p "$GITHUB_WORKSPACE"/cas_rom
+          cd "$GITHUB_WORKSPACE"/cas_rom
+          aria2c -x16 -j$(nproc) -U "Mozilla/5.0" -d "$GITHUB_WORKSPACE" ${{ github.event.inputs.cas_URL }}
+      - name: 4.解包并准备相关文件
+        run: |
+          # 设置权限
+          sudo chmod 777 "$GITHUB_WORKSPACE"/tools/payload-dumper-go
+          sudo chmod 777 "$GITHUB_WORKSPACE"/tools/brotli
+          # 创建目录
+          mkdir -p "$GITHUB_WORKSPACE"/PSYCHE
+          mkdir -p "$GITHUB_WORKSPACE"/CAS
+          mkdir -p "$GITHUB_WORKSPACE"/images
+          mkdir -p "$GITHUB_WORKSPACE"/zip
+          mkdir -p "$GITHUB_WORKSPACE"/firmware
+          mkdir -p "$GITHUB_WORKSPACE"/cas_files/nfc/lib
+          mkdir -p "$GITHUB_WORKSPACE"/cas_files/nfc/lib64
+          mkdir -p "$GITHUB_WORKSPACE"/cas_files/nfc/app/NQNfcNci
+          ZIP_NAME_PSYCHE=$(echo ${{ github.event.inputs.psyche_URL }} | cut -d"/" -f5)
+          # 进行解压
+          # 解压psyche部分
+          7z x "$GITHUB_WORKSPACE"/psyche_rom/$ZIP_NAME_PSYCHE -r -o"$GITHUB_WORKSPACE"/PSYCHE
+          sudo rm -rf "$GITHUB_WORKSPACE"/psyche_rom/$ZIP_NAME_PSYCHE
+          for i in system product system_ext; do
+              "$GITHUB_WORKSPACE"/tools/payload-dumper-go -p $i "$GITHUB_WORKSPACE"/PSYCHE/payload.bin
+              mv "$GITHUB_WORKSPACE"/payload/$i.img "$GITHUB_WORKSPACE"/images/$i.img
+              sudo python3 "$GITHUB_WORKSPACE"/tools/imgextractorLinux.py "$GITHUB_WORKSPACE"/images/$i.img "$GITHUB_WORKSPACE"/images
+              rm -rf "$GITHUB_WORKSPACE"/images/$i.img
+          done
+          rm -rf "$GITHUB_WORKSPACE"/payload
+          rm -rf "$GITHUB_WORKSPACE"/PSYCHE
+          # 解压cas部分
+          7z x "$GITHUB_WORKSPACE"/cas_rom/${{ env.ORIGN_ZIP_NAME }} -r -o"$GITHUB_WORKSPACE"/CAS boot.img
+          7z x "$GITHUB_WORKSPACE"/cas_rom/${{ env.ORIGN_ZIP_NAME }} -r -o"$GITHUB_WORKSPACE"/CAS firmware-update
+          for i in system product odm vendor; do
+              7z x "$GITHUB_WORKSPACE"/cas_rom/${{ env.ORIGN_ZIP_NAME }} -o"$GITHUB_WORKSPACE"/CAS $i.transfer.list
+              7z x "$GITHUB_WORKSPACE"/cas_rom/${{ env.ORIGN_ZIP_NAME }} -o"$GITHUB_WORKSPACE"/CAS $i.patch.dat
+              7z x "$GITHUB_WORKSPACE"/cas_rom/${{ env.ORIGN_ZIP_NAME }} -o"$GITHUB_WORKSPACE"/CAS $i.new.dat.br
+              "$GITHUB_WORKSPACE"/tools/brotli -d "$GITHUB_WORKSPACE"/CAS/$i.new.dat.br
+              rm -rf "$GITHUB_WORKSPACE"/CAS/$i.new.dat.br
+              python3 "$GITHUB_WORKSPACE"/tools/sdat2img.py "$GITHUB_WORKSPACE"/CAS/$i.transfer.list "$GITHUB_WORKSPACE"/CAS/$i.new.dat "$GITHUB_WORKSPACE"/CAS/$i.img
+              rm -rf "$GITHUB_WORKSPACE"/CAS/$i.patch.dat
+              rm -rf "$GITHUB_WORKSPACE"/CAS/$i.transfer.list
+              rm -rf "$GITHUB_WORKSPACE"/CAS/$i.new.dat
+              sudo python3 "$GITHUB_WORKSPACE"/tools/imgextractorLinux.py "$GITHUB_WORKSPACE"/CAS/$i.img "$GITHUB_WORKSPACE"/CAS
+              if [ $i == system ]; then
+                  sudo rm -rf "$GITHUB_WORKSPACE"/CAS/system.img
+                  # NFC Fix
+                  for j in lib lib64; do
+                      sudo cp -f "$GITHUB_WORKSPACE"/CAS/system/system/$j/libsn100nfc-nci.so "$GITHUB_WORKSPACE"/cas_files/nfc/$j/
+                      sudo cp -f "$GITHUB_WORKSPACE"/CAS/system/system/$j/libsn100nfc_nci_jni.so "$GITHUB_WORKSPACE"/cas_files/nfc/$j/
+                      sudo cp -f "$GITHUB_WORKSPACE"/CAS/vendor/$j/vendor.nxp.hardware.nfc@1.0.so "$GITHUB_WORKSPACE"/cas_files/nfc/$j/
+                      sudo cp -f "$GITHUB_WORKSPACE"/CAS/vendor/$j/vendor.nxp.hardware.nfc@1.1.so "$GITHUB_WORKSPACE"/cas_files/nfc/$j/
+                      sudo cp -f "$GITHUB_WORKSPACE"/CAS/vendor/$j/vendor.nxp.hardware.nfc@2.0.so "$GITHUB_WORKSPACE"/cas_files/nfc/$j/
+                  done
+                  sudo cp -f "$GITHUB_WORKSPACE"/CAS/system/system/app/NQNfcNci/NQNfcNci.apk "$GITHUB_WORKSPACE"/cas_files/nfc/app/NQNfcNci/
+                  sudo cp -r "$GITHUB_WORKSPACE"/CAS/system/system/app/NQNfcNci/oat "$GITHUB_WORKSPACE"/cas_files/nfc/app/NQNfcNci/
+                  cd "$GITHUB_WORKSPACE"/cas_files/nfc
+                  zip -r "$GITHUB_WORKSPACE"/cas_files/nfc.zip *
+                  cd "$GITHUB_WORKSPACE"
+                  sudo rm -rf "$GITHUB_WORKSPACE"/CAS/system
+              elif [ $i == product ]; then
+                  sudo rm -rf "$GITHUB_WORKSPACE"/CAS/product.img
+                  sudo cp -f "$GITHUB_WORKSPACE"/CAS/product/overlay/AospFrameworkResOverlay.apk "$GITHUB_WORKSPACE"/cas_files/
+                  sudo cp -f "$GITHUB_WORKSPACE"/CAS/product/overlay/DevicesAndroidOverlay.apk "$GITHUB_WORKSPACE"/cas_files/
+                  sudo cp -f "$GITHUB_WORKSPACE"/CAS/product/overlay/DevicesOverlay.apk "$GITHUB_WORKSPACE"/cas_files/
+                  sudo cp -f "$GITHUB_WORKSPACE"/CAS/product/etc/device_features/cas.xml "$GITHUB_WORKSPACE"/cas_files/
+                  sudo rm -rf "$GITHUB_WORKSPACE"/CAS/product
+              elif [ $i == odm ]; then
+                  sudo rm -rf "$GITHUB_WORKSPACE"/CAS/odm
+              fi
+          done
+          sudo rm -rf "$GITHUB_WORKSPACE"/cas_rom/${{ env.ORIGN_ZIP_NAME }}
+      - name: 5.替换相关文件
+        run: |
+          sudo rm -rf "$GITHUB_WORKSPACE"/images/product/etc/device_features/*
+          sudo rm -rf "$GITHUB_WORKSPACE"/images/product/overlay/DeviceAndroidConfig.apk
+          sudo rm -rf "$GITHUB_WORKSPACE"/images/product/overlay/DeviceConfig.apk
+          sudo cp -f "$GITHUB_WORKSPACE"/cas_files/AospFrameworkResOverlay.apk "$GITHUB_WORKSPACE"/images/product/overlay
+          sudo cp -f "$GITHUB_WORKSPACE"/cas_files/DevicesAndroidOverlay.apk "$GITHUB_WORKSPACE"/images/product/overlay
+          sudo cp -f "$GITHUB_WORKSPACE"/cas_files/DevicesOverlay.apk "$GITHUB_WORKSPACE"/images/product/overlay
+          sudo cp -f "$GITHUB_WORKSPACE"/cas_files/cas.xml "$GITHUB_WORKSPACE"/images/product/etc/device_features
+          sudo unzip -o "$GITHUB_WORKSPACE"/cas_files/nfc.zip -d "$GITHUB_WORKSPACE"/images/system_ext
+          sudo rm -rf "$GITHUB_WORKSPACE"/CAS/vendor/recovery-from-boot.p
+          sudo rm -rf "$GITHUB_WORKSPACE"/CAS/vendor/bin/install-recovery.sh
+          sudo mv -f "$GITHUB_WORKSPACE"/cas_files/vbmeta.img "$GITHUB_WORKSPACE"/CAS/firmware-update
+          sudo mv -f "$GITHUB_WORKSPACE"/cas_files/vbmeta_system.img "$GITHUB_WORKSPACE"/CAS/firmware-update
+          sudo mv -f "$GITHUB_WORKSPACE"/cas_files/FlashWindows.bat "$GITHUB_WORKSPACE"/images
+          sudo cp -r "$GITHUB_WORKSPACE"/cas_files/bin "$GITHUB_WORKSPACE"/images
+          sudo cp -r "$GITHUB_WORKSPACE"/CAS/firmware-update "$GITHUB_WORKSPACE"/images
+          sudo mv -f "$GITHUB_WORKSPACE"/cas_files/super_empty.img "$GITHUB_WORKSPACE"/images/firmware-update
+          # 停更方案
+          #sudo tar -zxvf "$GITHUB_WORKSPACE"/cas_files/boot_official.tar.gz -C "$GITHUB_WORKSPACE"/images
+          #sudo tar -zxvf "$GITHUB_WORKSPACE"/cas_files/boot_magisk.tar.gz -C "$GITHUB_WORKSPACE"/images
+          # 未停更方案 开始
+          sudo mv -f "$GITHUB_WORKSPACE"/CAS/boot.img "$GITHUB_WORKSPACE"/CAS/boot_official.img
+          sudo mv -f "$GITHUB_WORKSPACE"/CAS/boot_official.img "$GITHUB_WORKSPACE"/images
+          # 未停更方案 结束 
+          sudo cp -r "$GITHUB_WORKSPACE"/cas_files/META-INF "$GITHUB_WORKSPACE"/images
+          sudo cp -r "$GITHUB_WORKSPACE"/CAS/* "$GITHUB_WORKSPACE"/images
+          sudo rm -rf "$GITHUB_WORKSPACE"/CAS
+          #sudo rm -rf "$GITHUB_WORKSPACE"/images/system/system/app/Updater
+          # fix 无线充动画 By PedroZ
+          chmod 777 "$GITHUB_WORKSPACE"/tools/apktool.jar
+          Apktool="java -jar "$GITHUB_WORKSPACE"/tools/apktool.jar"
+          mkdir -p "$GITHUB_WORKSPACE"/MiuiSystemUI/one/MiuiSystemUI/
+          mkdir -p "$GITHUB_WORKSPACE"/MiuiSystemUI/two/
+          mkdir -p "$GITHUB_WORKSPACE"/MiuiSystemUI/three/
+          unzip -o "$GITHUB_WORKSPACE"/images/system_ext/priv-app/MiuiSystemUI/MiuiSystemUI.apk 'classes*.dex' -d "$GITHUB_WORKSPACE"/MiuiSystemUI/one/
+          cd "$GITHUB_WORKSPACE"/MiuiSystemUI/one/
+          sudo 7z a -tzip "$GITHUB_WORKSPACE"/MiuiSystemUI/one/MiuiSystemUI.apk ./*
+          $Apktool d -q -r -f -o "$GITHUB_WORKSPACE"/MiuiSystemUI/one/MiuiSystemUI/ "$GITHUB_WORKSPACE"/MiuiSystemUI/one/MiuiSystemUI.apk
+          uisystem=com/android/keyguard/charge/container/MiuiChargeAnimationView.smali
+          sudo sed -i '/^.method protected updateSizeForScreenSizeChange()V/,/^.end method/d' "$GITHUB_WORKSPACE"/MiuiSystemUI/one/MiuiSystemUI/smali*/com/android/keyguard/charge/container/MiuiChargeAnimationView.smali
+          mod1=$(cat "$GITHUB_WORKSPACE"/cas_files/updateSizeForScreenSizeChange.smali)   
+          echo "$mod1" >> "$GITHUB_WORKSPACE"/MiuiSystemUI/one/MiuiSystemUI/smali*/com/android/keyguard/charge/container/MiuiChargeAnimationView.smali
+          mkdir -p "$GITHUB_WORKSPACE"/MiuiSystemUI/two/MiuiSystemUI/smali/$uisystem
+          cp -rf "$GITHUB_WORKSPACE"/MiuiSystemUI/one/MiuiSystemUI/smali*/$uisystem "$GITHUB_WORKSPACE"/MiuiSystemUI/two/MiuiSystemUI/smali/$uisystem
+          cp -rf "$GITHUB_WORKSPACE"/MiuiSystemUI/one/MiuiSystemUI/apktool.yml "$GITHUB_WORKSPACE"/MiuiSystemUI/two/MiuiSystemUI/
+          $Apktool b -q -f -o "$GITHUB_WORKSPACE"/MiuiSystemUI/two/MiuiSystemUI.apk "$GITHUB_WORKSPACE"/MiuiSystemUI/two/MiuiSystemUI/
+          filepath="$GITHUB_WORKSPACE"/MiuiSystemUI/one/
+          for file in $(ls -a $filepath); do
+              if [ "${file##*.}"x = "dex"x ]; then
+                  old=$(echo $file | tr -d "a-zA-Z" | tr -d ".")
+                  if [ -Z $old ]; then
+                      old=1
+                  fi
+                  new=$(echo $old | awk '{for(i=1;i<=NF;i++){$i+=1}}1')
+                  cp -rf "$GITHUB_WORKSPACE"/MiuiSystemUI/one/$file "$GITHUB_WORKSPACE"/MiuiSystemUI/three/classes$new.dex
+              fi
+          done
+          unzip -o "$GITHUB_WORKSPACE"/MiuiSystemUI/two/MiuiSystemUI.apk -d "$GITHUB_WORKSPACE"/MiuiSystemUI/three/
+          ls -a "$GITHUB_WORKSPACE"/MiuiSystemUI/three/
+          cd "$GITHUB_WORKSPACE"/MiuiSystemUI/three/
+          sudo 7z a "$GITHUB_WORKSPACE"/images/system_ext/priv-app/MiuiSystemUI/MiuiSystemUI.apk ./*.dex -mx0
+          cd "$GITHUB_WORKSPACE"/cas_files/systemui
+          sudo 7z a "$GITHUB_WORKSPACE"/images/system_ext/priv-app/MiuiSystemUI/MiuiSystemUI.apk ./* -mx0
+          cd "$GITHUB_WORKSPACE"
+          sudo mv "$GITHUB_WORKSPACE"/images/system_ext/priv-app/MiuiSystemUI/MiuiSystemUI.apk "$GITHUB_WORKSPACE"/MiuiSystemUI/MiuiSystemUI.apk
+          sudo zipalign -v 4 "$GITHUB_WORKSPACE"/MiuiSystemUI/MiuiSystemUI.apk "$GITHUB_WORKSPACE"/images/system_ext/priv-app/MiuiSystemUI/MiuiSystemUI.apk >/dev/null
+          # 删除预装 By PedroZ
+          sudo rm -rf "$GITHUB_WORKSPACE"/images/system/system/app/MSA
+          for files in MIShop MIUINewHome MIUIGameCenter MIUIHuanji MIUIYoupin MIUIDuokanReader MIUIEmail MIUIVipAccount SmartHome MIMediaEditor MIGalleryLockscreen Health; do
+              dataapp=$(find "$GITHUB_WORKSPACE"/images/system/system/data-app/ -name $files)
+              sudo rm -rf $dataapp
+          done
+          for files in MIUIMusic MIUIVideo; do
+              prepkg=$(find "$GITHUB_WORKSPACE"/images/system/system/priv-app/ -name $files)
+              sudo rm -rf $prepkg
+          done
+          # 修改props By PedroZ
+          sudo sed -i 's/ro.product.mod_device=[^*]*/ro.product.mod_device=cas_pre/' "$GITHUB_WORKSPACE"/images/system/system/build.prop
+          sudo sed -i 's/ro.miui.cust_device=[^*]*/ro.miui.cust_device=cas/' "$GITHUB_WORKSPACE"/images/system/system/build.prop
+          # 声音动效动画 By PedroZ
+          sudo unzip -o -q "$GITHUB_WORKSPACE"/${{ env.device }}_files/etc.zip -d "$GITHUB_WORKSPACE"/images/system/system/etc/audio/
+          rm -rf "$GITHUB_WORKSPACE"/${{ env.device }}_files
+      - name: 6.打包
+        run: |
+          sudo chmod 777 "$GITHUB_WORKSPACE"/tools/mke2fs
+          sudo chmod 777 "$GITHUB_WORKSPACE"/tools/e2fsdroid
+          sudo chmod 777 "$GITHUB_WORKSPACE"/tools/img2simg
+          sudo chmod 777 "$GITHUB_WORKSPACE"/tools/brotli
+          sudo chmod 777 "$GITHUB_WORKSPACE"/tools/lpmake
+          odm_size=$(sudo du -sb "$GITHUB_WORKSPACE"/images/odm.img | awk {'print $1'})
+          product_size=$(sudo du -sb "$GITHUB_WORKSPACE"/images/product | awk {'print $1'})
+          product_size=$(echo "$product_size + 20971520" | bc)
+          product_size=$(echo "$product_size / 4096" | bc)
+          vendor_size=$(sudo du -sb "$GITHUB_WORKSPACE"/images/vendor | awk {'print $1'})
+          vendor_size=$(echo "$vendor_size + 9895936" | bc)
+          vendor_size=$(echo "$vendor_size / 4096" | bc)
+          system_ext_size=$(sudo du -sb "$GITHUB_WORKSPACE"/images/system_ext | awk {'print $1'})
+          system_ext_size=$(echo "$system_ext_size + 23488103" | bc)
+          system_ext_size=$(echo "$system_ext_size / 4096" | bc)
+          system_size=$(sudo du -sb "$GITHUB_WORKSPACE"/images/system | awk {'print $1'})
+          system_size=$(echo "$system_size + 104857600" | bc)
+          system_size=$(echo "$system_size / 4096" | bc)
+          for i in product vendor system_ext system; do
+              sudo python3 "$GITHUB_WORKSPACE"/tools/fspatch.py "$GITHUB_WORKSPACE"/images/$i "$GITHUB_WORKSPACE"/images/TI_config/"$i"_fs_config
+              "$GITHUB_WORKSPACE"/tools/mke2fs -O ^has_journal -L $i -I 256 -M /$i -m 0 -t ext4 -b 4096 "$GITHUB_WORKSPACE"/images/$i.img $(eval echo "$"$i"_size")
+              sudo "$GITHUB_WORKSPACE"/tools/e2fsdroid -e -T 1230768000 -C "$GITHUB_WORKSPACE"/images/TI_config/"$i"_fs_config -S "$GITHUB_WORKSPACE"/images/TI_config/"$i"_file_contexts -f "$GITHUB_WORKSPACE"/images/$i -a /$i "$GITHUB_WORKSPACE"/images/$i.img
+              resize2fs -f -M "$GITHUB_WORKSPACE"/images/$i.img
+              eval "$i"_size=$(du -sb "$GITHUB_WORKSPACE"/images/$i.img | awk {'print $1'})
+              sudo rm -rf "$GITHUB_WORKSPACE"/images/$i
+          done
+          sudo rm -rf "$GITHUB_WORKSPACE"/images/TI_config
+          "$GITHUB_WORKSPACE"/tools/lpmake --metadata-size 65536 --super-name super --block-size=4096 --partition odm:readonly:$odm_size:qti_dynamic_partitions --image odm="$GITHUB_WORKSPACE"/images/odm.img --partition product:readonly:$product_size:qti_dynamic_partitions --image product="$GITHUB_WORKSPACE"/images/product.img --partition system:readonly:$system_size:qti_dynamic_partitions --image system="$GITHUB_WORKSPACE"/images/system.img --partition system_ext:readonly:$system_ext_size:qti_dynamic_partitions --image system_ext="$GITHUB_WORKSPACE"/images/system_ext.img --partition vendor:readonly:$vendor_size:qti_dynamic_partitions --image vendor="$GITHUB_WORKSPACE"/images/vendor.img --device super:9126805504 --metadata-slots 2 --group qti_dynamic_partitions:9126805504 -F --output "$GITHUB_WORKSPACE"/images/super.img
+          for i in product system system_ext vendor odm; do
+              rm -rf "$GITHUB_WORKSPACE"/images/$i.img
+          done
+          zstd "$GITHUB_WORKSPACE"/images/super.img -o "$GITHUB_WORKSPACE"/images/super.zst --rm
+          sudo 7z a "$GITHUB_WORKSPACE"/zip/miui_CASPRE_${{ env.date }}.zip "$GITHUB_WORKSPACE"/images/*
+          sudo rm -rf "$GITHUB_WORKSPACE"/images
+          md5=$(md5sum "$GITHUB_WORKSPACE"/zip/miui_CASPRE_${{ env.date }}.zip)
+          echo "MD5=${md5:0:32}" >> $GITHUB_ENV
+          zipmd5=${md5:0:10}
+          mv "$GITHUB_WORKSPACE"/zip/miui_CASPRE_${{ env.date }}.zip "$GITHUB_WORKSPACE"/zip/miui_CASPRE_"${{ env.date }}"_"$zipmd5"_12.0_2in1.zip
+          echo "NEW_PACKAGE_NAME=miui_CASPRE_"${{ env.date }}"_"$zipmd5"_12.0_2in1.zip" >> $GITHUB_ENV
+      - name: 7.上传到123盘
+        run: |
+          upload(){
+              rclone mkdir ${{ env.cloud }}:/CAS_Packages
+              rclone sync -P ./zip/* ${{ env.cloud }}:/CAS_Packages
+          }
+          # 选择网盘
+          if [[ ${{ github.event.inputs.upload }} == "ali" ]]; then
+              nohup aliyundrive-webdav --refresh-token ${{ secrets.REFRESHTOKEN }} --host 127.0.0.1 --port 1987 --auth-user Weverse --auth-password ${{ secrets.PASSWORD }} >/dev/null 2>& 1 &
+              cloud=alipan
+          elif [[ ${{ github.event.inputs.upload }} == "all" ]]
+              nohup aliyundrive-webdav --refresh-token ${{ secrets.REFRESHTOKEN }} --host 127.0.0.1 --port 1987 --auth-user Weverse --auth-password ${{ secrets.PASSWORD }} >/dev/null 2>& 1 &
+              cloud=alipan
+              upload
+              cloud=123pan
+              upload
+          else
+              cloud=123pan
+              upload
+          fi
+      - name: 8.发送打包成功通知
+        run: |
+          mkdir "$GITHUB_WORKSPACE"/romdata && touch "$GITHUB_WORKSPACE"/romdata/cas.ini
+          echo casPKG=${{ env.NEW_PACKAGE_NAME }} >> "$GITHUB_WORKSPACE"/romdata/cas.ini
+          echo casMD5=${{ env.MD5 }} >> "$GITHUB_WORKSPACE"/romdata/cas.ini
+          echo casTIME=\"$(TZ=':Asia/Shanghai' date '+%Y.%m.%d %H:%M')\" >> "$GITHUB_WORKSPACE"/romdata/cas.ini
+          curl -i -X POST -H 'Content-type':'application/json' -d '{"appToken":"${{secrets.appToken}}","summary":"小米10Ultra ${{env.date}}已构建完成","content":" **小米10Ultra ${{env.date}}已构建完成** \n \n **包名：${{env.NEW_PACKAGE_NAME}}** \n \n **MD5：${{env.MD5}}** \n \n 下载地址为：[https://www.123pan.com/s/jKv8Vv-liDWd](https://www.123pan.com/s/jKv8Vv-liDWd) ","topicIds":[7122],"contentType":3}' http://wxpusher.zjiecode.com/api/send/message || true
+          curl -i -X POST -H 'Content-type':'application/json' -d '{"token":"${{secrets.appToken2}}","title":"小米10Ultra ${{env.date}}已构建完成","content":" **小米10Ultra ${{env.date}}已构建完成** \n \n **包名：${{env.NEW_PACKAGE_NAME}}** \n \n **MD5：${{env.MD5}}** \n \n **下载地址为：[https://www.123pan.com/s/jKv8Vv-SiDWd](https://www.123pan.com/s/jKv8Vv-SiDWd)** ","topic":"cas","template":"markdown"}' http://www.pushplus.plus/send || true
+          page_use(){
+              - name: 9.导出信息
+              uses: dmnemec/copy_file_to_another_repo_action@main
+              env:
+                API_TOKEN_GITHUB: ${{ secrets.API_TOKEN_GITHUB }}
+              with:
+                source_file: 'romdata/cas.ini'
+                destination_repo: 'zjw2017/sm8250-page'
+                destination_folder: 'device'
+                user_email: 'example@email.com'
+                user_name: 'zjw2017'
+                commit_message: 'Update from $GITHUB_REF'
+          }
+      - name: 10.删除工作流运行
+        uses: Mattraks/delete-workflow-runs@v2
+        with:
+          token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          retain_days: 0
+          keep_minimum_runs: 0
