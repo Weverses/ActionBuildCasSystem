@@ -210,7 +210,7 @@ jobs:
           sudo sed -i 's/ro.miui.cust_device=[^*]*/ro.miui.cust_device=cas/' "$GITHUB_WORKSPACE"/images/system/system/build.prop
           # 声音动效动画 By PedroZ
           sudo unzip -o -q "$GITHUB_WORKSPACE"/cas_files/etc.zip -d "$GITHUB_WORKSPACE"/images/system/system/etc/audio/
-          rm -rf "$GITHUB_WORKSPACE"/cas_files
+          sudo rm -rf "$GITHUB_WORKSPACE"/cas_files
       - name: 6.打包
         run: |
           sudo chmod 777 "$GITHUB_WORKSPACE"/tools/mke2fs
