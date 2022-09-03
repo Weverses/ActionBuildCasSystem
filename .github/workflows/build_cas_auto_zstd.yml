@@ -244,12 +244,12 @@ jobs:
               sudo python3 "$GITHUB_WORKSPACE"/tools/fspatch.py "$GITHUB_WORKSPACE"/images/$i "$GITHUB_WORKSPACE"/images/TI_config/"$i"_fs_config
               sudo "$GITHUB_WORKSPACE"/tools/mke2fs -O ^has_journal -L $i -I 256 -M /$i -m 0 -t ext4 -b 4096 "$GITHUB_WORKSPACE"/images/$i.img $(eval echo "$"$i"_size")
               sudo "$GITHUB_WORKSPACE"/tools/e2fsdroid -e -T 1230768000 -C "$GITHUB_WORKSPACE"/images/TI_config/"$i"_fs_config -S "$GITHUB_WORKSPACE"/images/TI_config/"$i"_file_contexts -f "$GITHUB_WORKSPACE"/images/$i -a /$i "$GITHUB_WORKSPACE"/images/$i.img
-              resize2fs -f -M "$GITHUB_WORKSPACE"/images/$i.img
+              sudo resize2fs -f -M "$GITHUB_WORKSPACE"/images/$i.img
               eval "$i"_size=$(du -sb "$GITHUB_WORKSPACE"/images/$i.img | awk {'print $1'})
               sudo rm -rf "$GITHUB_WORKSPACE"/images/$i
           done
           sudo rm -rf "$GITHUB_WORKSPACE"/images/TI_config
-          "$GITHUB_WORKSPACE"/tools/lpmake --metadata-size 65536 --super-name super --block-size=4096 --partition odm:readonly:$odm_size:qti_dynamic_partitions --image odm="$GITHUB_WORKSPACE"/images/odm.img --partition product:readonly:$product_size:qti_dynamic_partitions --image product="$GITHUB_WORKSPACE"/images/product.img --partition system:readonly:$system_size:qti_dynamic_partitions --image system="$GITHUB_WORKSPACE"/images/system.img --partition system_ext:readonly:$system_ext_size:qti_dynamic_partitions --image system_ext="$GITHUB_WORKSPACE"/images/system_ext.img --partition vendor:readonly:$vendor_size:qti_dynamic_partitions --image vendor="$GITHUB_WORKSPACE"/images/vendor.img --device super:9126805504 --metadata-slots 2 --group qti_dynamic_partitions:9126805504 -F --output "$GITHUB_WORKSPACE"/images/super.img
+          sudo "$GITHUB_WORKSPACE"/tools/lpmake --metadata-size 65536 --super-name super --block-size=4096 --partition odm:readonly:$odm_size:qti_dynamic_partitions --image odm="$GITHUB_WORKSPACE"/images/odm.img --partition product:readonly:$product_size:qti_dynamic_partitions --image product="$GITHUB_WORKSPACE"/images/product.img --partition system:readonly:$system_size:qti_dynamic_partitions --image system="$GITHUB_WORKSPACE"/images/system.img --partition system_ext:readonly:$system_ext_size:qti_dynamic_partitions --image system_ext="$GITHUB_WORKSPACE"/images/system_ext.img --partition vendor:readonly:$vendor_size:qti_dynamic_partitions --image vendor="$GITHUB_WORKSPACE"/images/vendor.img --device super:9126805504 --metadata-slots 2 --group qti_dynamic_partitions:9126805504 -F --output "$GITHUB_WORKSPACE"/images/super.img
           for i in product system system_ext vendor odm; do
               rm -rf "$GITHUB_WORKSPACE"/images/$i.img
           done
