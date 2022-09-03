@@ -107,6 +107,9 @@ jobs:
                   sudo cp -f "$GITHUB_WORKSPACE"/CAS/system/system/app/NQNfcNci/NQNfcNci.apk "$GITHUB_WORKSPACE"/cas_files/nfc/app/NQNfcNci/
                   sudo cp -r "$GITHUB_WORKSPACE"/CAS/system/system/app/NQNfcNci/oat "$GITHUB_WORKSPACE"/cas_files/nfc/app/NQNfcNci/
                   sudo rm -rf "$GITHUB_WORKSPACE"/CAS/system
+                  rm -rf "$GITHUB_WORKSPACE"/CAS/TI_config/"$i"_fs_config 
+                  rm -rf "$GITHUB_WORKSPACE"/CAS/TI_config/"$i"_file_contexts
+                  rm -rf "$GITHUB_WORKSPACE"/CAS/TI_config/"$i"_fs_config
               elif [ $i == vendor ]; then
                   for j in lib lib64; do
                       sudo cp -f "$GITHUB_WORKSPACE"/CAS/vendor/$j/vendor.nxp.hardware.nfc@1.0.so "$GITHUB_WORKSPACE"/cas_files/nfc/$j/
@@ -123,8 +126,14 @@ jobs:
                   sudo cp -f "$GITHUB_WORKSPACE"/CAS/product/overlay/DevicesOverlay.apk "$GITHUB_WORKSPACE"/cas_files/
                   sudo cp -f "$GITHUB_WORKSPACE"/CAS/product/etc/device_features/cas.xml "$GITHUB_WORKSPACE"/cas_files/
                   sudo rm -rf "$GITHUB_WORKSPACE"/CAS/product
+                  rm -rf "$GITHUB_WORKSPACE"/CAS/TI_config/"$i"_fs_config 
+                  rm -rf "$GITHUB_WORKSPACE"/CAS/TI_config/"$i"_file_contexts
+                  rm -rf "$GITHUB_WORKSPACE"/CAS/TI_config/"$i"_fs_config
               elif [ $i == odm ]; then
                   sudo rm -rf "$GITHUB_WORKSPACE"/CAS/odm
+                  rm -rf "$GITHUB_WORKSPACE"/CAS/TI_config/"$i"_fs_config 
+                  rm -rf "$GITHUB_WORKSPACE"/CAS/TI_config/"$i"_file_contexts
+                  rm -rf "$GITHUB_WORKSPACE"/CAS/TI_config/"$i"_fs_config
               fi
           done
           sudo rm -rf "$GITHUB_WORKSPACE"/cas_rom/${{ env.ORIGN_ZIP_NAME }}
