@@ -264,8 +264,8 @@ jobs:
       - name: 7.上传到123盘
         run: |
           upload(){
-              rclone mkdir ${{ env.cloud }}:/CAS_Packages
-              rclone sync -P ./zip/* ${{ env.cloud }}:/CAS_Packages
+              rclone mkdir CAS:/CAS_Packages
+              rclone sync -P ./zip/* CAS:/CAS_Packages
           }
           # 选择网盘
           if [[ ${{ github.event.inputs.upload }} == "ali" ]]; then
