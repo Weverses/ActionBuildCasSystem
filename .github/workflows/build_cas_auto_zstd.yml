@@ -52,12 +52,10 @@ jobs:
         run: |
           # 下载psyche的最新系统包
           mkdir -p "$GITHUB_WORKSPACE"/psyche_rom
-          cd "$GITHUB_WORKSPACE"/psyche_rom
-          aria2c -x16 -j$(nproc) -U "Mozilla/5.0" -d "$GITHUB_WORKSPACE" ${{ github.event.inputs.psyche_URL }}
+          aria2c -x16 -j$(nproc) -U "Mozilla/5.0" -d "$GITHUB_WORKSPACE"/psyche_rom ${{ github.event.inputs.psyche_URL }}
           # 下载cas的最新系统包
           mkdir -p "$GITHUB_WORKSPACE"/cas_rom
-          cd "$GITHUB_WORKSPACE"/cas_rom
-          aria2c -x16 -j$(nproc) -U "Mozilla/5.0" -d "$GITHUB_WORKSPACE" ${{ github.event.inputs.cas_URL }}
+          aria2c -x16 -j$(nproc) -U "Mozilla/5.0" -d "$GITHUB_WORKSPACE"/cas_rom ${{ github.event.inputs.cas_URL }}
       - name: 4.解包并准备相关文件
         run: |
           # 设置权限
