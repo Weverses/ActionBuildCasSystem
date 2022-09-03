@@ -261,11 +261,11 @@ jobs:
           zipmd5=${md5:0:10}
           mv "$GITHUB_WORKSPACE"/zip/miui_CASPRE_${{ env.date }}.zip "$GITHUB_WORKSPACE"/zip/miui_CASPRE_"${{ env.date }}"_"$zipmd5"_12.0_2in1.zip
           echo "NEW_PACKAGE_NAME=miui_CASPRE_"${{ env.date }}"_"$zipmd5"_12.0_2in1.zip" >> $GITHUB_ENV
-      - name: 7.上传到123盘
+      - name: 7.上传到网盘
         run: |
           upload(){
-              rclone mkdir ${{ env.cloud }}:/CAS_Packages
-              rclone sync -P ./zip/* ${{ env.cloud }}:/CAS_Packages
+              rclone mkdir $cloud:/CAS_Packages
+              rclone sync -P ./zip/* $cloud:/CAS_Packages
           }
           # 选择网盘
           if [[ ${{ github.event.inputs.upload }} == "ali" ]]; then
