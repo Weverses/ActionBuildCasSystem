@@ -103,16 +103,19 @@ jobs:
                   for j in lib lib64; do
                       sudo cp -f "$GITHUB_WORKSPACE"/CAS/system/system/$j/libsn100nfc-nci.so "$GITHUB_WORKSPACE"/cas_files/nfc/$j/
                       sudo cp -f "$GITHUB_WORKSPACE"/CAS/system/system/$j/libsn100nfc_nci_jni.so "$GITHUB_WORKSPACE"/cas_files/nfc/$j/
+                  done
+                  sudo cp -f "$GITHUB_WORKSPACE"/CAS/system/system/app/NQNfcNci/NQNfcNci.apk "$GITHUB_WORKSPACE"/cas_files/nfc/app/NQNfcNci/
+                  sudo cp -r "$GITHUB_WORKSPACE"/CAS/system/system/app/NQNfcNci/oat "$GITHUB_WORKSPACE"/cas_files/nfc/app/NQNfcNci/
+                  sudo rm -rf "$GITHUB_WORKSPACE"/CAS/system
+              elif [ $i == vendor ]; then
+                  for j in lib lib64; do
                       sudo cp -f "$GITHUB_WORKSPACE"/CAS/vendor/$j/vendor.nxp.hardware.nfc@1.0.so "$GITHUB_WORKSPACE"/cas_files/nfc/$j/
                       sudo cp -f "$GITHUB_WORKSPACE"/CAS/vendor/$j/vendor.nxp.hardware.nfc@1.1.so "$GITHUB_WORKSPACE"/cas_files/nfc/$j/
                       sudo cp -f "$GITHUB_WORKSPACE"/CAS/vendor/$j/vendor.nxp.hardware.nfc@2.0.so "$GITHUB_WORKSPACE"/cas_files/nfc/$j/
                   done
-                  sudo cp -f "$GITHUB_WORKSPACE"/CAS/system/system/app/NQNfcNci/NQNfcNci.apk "$GITHUB_WORKSPACE"/cas_files/nfc/app/NQNfcNci/
-                  sudo cp -r "$GITHUB_WORKSPACE"/CAS/system/system/app/NQNfcNci/oat "$GITHUB_WORKSPACE"/cas_files/nfc/app/NQNfcNci/
                   cd "$GITHUB_WORKSPACE"/cas_files/nfc
                   zip -r "$GITHUB_WORKSPACE"/cas_files/nfc.zip *
                   cd "$GITHUB_WORKSPACE"
-                  sudo rm -rf "$GITHUB_WORKSPACE"/CAS/system
               elif [ $i == product ]; then
                   sudo rm -rf "$GITHUB_WORKSPACE"/CAS/product.img
                   sudo cp -f "$GITHUB_WORKSPACE"/CAS/product/overlay/AospFrameworkResOverlay.apk "$GITHUB_WORKSPACE"/cas_files/
