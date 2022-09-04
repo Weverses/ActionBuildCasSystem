@@ -270,8 +270,7 @@ jobs:
           # 选择网盘
           if [[ ${{ github.event.inputs.upload }} == "ali" ]]; then
               nohup aliyundrive-webdav --refresh-token ${{ secrets.REFRESHTOKEN }} --host 127.0.0.1 --port 1987 --auth-user Weverse --auth-password ${{ secrets.PASSWORD }} >/dev/null 2>& 1 &
-              cloud=alip
-yun
+              cloud=aliyun
               upload
           elif [[ ${{ github.event.inputs.upload }} == "all" ]]; then
               nohup aliyundrive-webdav --refresh-token ${{ secrets.REFRESHTOKEN }} --host 127.0.0.1 --port 1987 --auth-user Weverse --auth-password ${{ secrets.PASSWORD }} >/dev/null 2>& 1 &
