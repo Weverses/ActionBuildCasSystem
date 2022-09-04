@@ -274,9 +274,9 @@ jobs:
               upload
           elif [[ ${{ github.event.inputs.upload }} == "all" ]]; then
               nohup aliyundrive-webdav --refresh-token ${{ secrets.REFRESHTOKEN }} --host 127.0.0.1 --port 1145 --auth-user Weverse --auth-password ${{ secrets.PASSWORD }} >/dev/null 2>& 1 &
-              cloud=aliyun
-              upload
               cloud=123pan
+              upload
+              cloud=aliyun
               upload
           else
               cloud=123pan
